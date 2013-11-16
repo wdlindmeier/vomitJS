@@ -43,16 +43,23 @@ Copyright (c) Nicolas Gallagher and Jonathan Neal
 
 #me, #them {
   margin-top: 15px;
-  background-color: #eee;
-}
+/*  background-color: #eee;
+*/}
 
 #my-video, #me_overlay, #them_overlay, #their-video {
   position: absolute;
 }
 
+.vomit{
+	position:absolute;
+	top:0;
+	left:0;
+	z-index:1000;
+}
+
 #them_overlay, #their-video 
 {
-    top:0;left:0;
+    top:0;left:0; z-index:-1;
 }
 #them {
     /*

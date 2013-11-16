@@ -1,0 +1,421 @@
+
+<html>
+<head>
+  <title>PeerJS - Video chat example</title>
+  <link rel="stylesheet" href="/MIKE/vomitJS/style.css">
+  <script>
+  var $MouthX = 0;
+  var $MouthY = 0;
+  var $MouthZ = 0;
+  </script>
+  <script type="text/javascript" src="/MIKE/vomitJS/jquery.min.js"></script>
+  <script type="text/javascript" src="http://cdn.peerjs.com/0.3/peer.js"></script>
+  <script type="text/javascript" src="/MIKE/vomitJS/speech.js"></script>
+  <script type="text/javascript" src="/MIKE/vomitJS/model_pca_20_svm.js"></script>
+  <script type="text/javascript" src="/MIKE/vomitJS/clm.js"></script>
+  <script type="text/javascript" src="/MIKE/vomitJS/chat.js"></script>
+  <script src="/libs/three.min.js"></script>
+    <script type="text/javascript" src="/MIKE/vomitJS/marchingCubes.js"></script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+
+      uniform float time;
+
+      uniform sampler2D texture1;
+      uniform sampler2D texture2;
+
+      varying vec2 texCoord;
+
+      void main( void ) {
+
+        vec4 noise = texture2D( texture1, texCoord );
+        
+        vec2 T1 = texCoord + vec2( 10., -10. ) * time  * 0.01;
+        vec2 T2 = texCoord + vec2( -0.5, 2.0 ) * time *  0.1;
+
+        T1.x -= noise.r * 2.0;
+        T1.y += noise.g * 4.0;
+        T2.x += noise.g * 0.2;
+        T2.y += noise.b * 0.2;
+
+        float p = texture2D( texture1, T1 * 2.0 ).a + 0.25;
+
+        vec4 color = texture2D( texture2, T2 );
+        vec4 temp = color * 2.0 * ( vec4( p, p, p, p ) ) + ( color * color );
+        gl_FragColor = texture2D( texture2, texCoord );
+      }
+
+    </script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+
+      varying vec2 texCoord;
+
+      void main()
+      {        
+        texCoord = uv;
+        vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+        gl_Position = projectionMatrix * mvPosition;
+      }
+
+    </script>
+
+
+
+</head>
+
+<body>
+
+  <div id="container" class="pure-g">
+
+    <!-- Video area -->
+    <div class="pure-u-2-3" id="video-container">
+      
+      <div id="them">     
+      <div id="c" style="z-index:100;"></div> 
+        <video id="their-video" width="640" height="480"  autoplay></video>
+<!--         <canvas id="them_overlay" width="640" height="480" ></canvas>
+
+ -->
+       
+
+       </div>
+      
+      <div id="me">
+        <video id="my-video" width="280" height="210" muted="true" autoplay></video>
+        <canvas id="me_overlay" width="280" height="210" ></canvas>
+      </div>
+      
+      <div id="positions"></div>
+
+    </div>
+
+    <!-- Steps -->
+    <div class="pure-u-1-3">
+      <h2>Vomitorium</h2>
+      <!-- Get local audio/video stream -->
+      <div id="step1">
+        <p>Please click `allow` on the top of the screen so we can access your webcam and microphone for calls.</p>
+        <div id="step1-error">
+          <p>Failed to access the webcam and microphone. Make sure to run this demo on an http server and click allow when asked for permission by the browser.</p>
+          <a href="#" class="pure-button pure-button-error" id="step1-retry">Try again</a>
+        </div>
+      </div>
+
+      <!-- Make calls to others -->
+      <div id="step2">
+        <p>Your id: <span id="my-id">...</span></p>
+        <p>Share this id with others so they can call you.</p>
+
+
+        <h3>Make a call</h3>
+        <div class="pure-form">
+          <input type="text" placeholder="Call user id..." id="callto-id">
+          <a href="#" class="pure-button pure-button-success" id="make-call">Call</a>
+        </div>
+      </div>
+
+      <!-- Call in progress -->
+      <div id="step3">
+        <p>Currently in call with <span id="their-id">...</span></p>
+        <p><a href="#" class="pure-button pure-button-error" id="end-call">End call</a></p>
+      </div>
+
+      <div id="step5">
+
+        <div class="pure-form">
+          <input type="text" placeholder="Message to send..." id="data-msg">
+          <a href="#" class="pure-button pure-button-success" id="send-data">Send</a>
+        </div>
+
+        <!--div class="pure-form">
+          <a href="#" class="pure-button pure-button-success" id="start-speech">Start speech</a>
+          <a href="#" class="pure-button pure-button-success" id="start-tracking">Start tracking</a>
+        </div-->
+          
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+
+var Emitter = function(){
+  THREE.Object3D.call(this);
+//  this.position = new THREE.Vector3(0,0,0);
+  //this.children = [];
+};
+
+//var emitterPos = new THREE.Vector3(.5,.5,.5);
+
+Emitter.prototype = Object.create(THREE.Object3D.prototype);
+Emitter.prototype.constructor = Emitter;
+Emitter.prototype.addParticle = function(x,y,z){
+  this.position.set(x,y,z);
+  randVec = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+  //var start = emitterPos.add(randVec);
+  var pos = this.position.clone().add(randVec.multiplyScalar(.005));
+  var p = new Particle();
+  p.init(.1);
+  p.setPos(pos.x,pos.y,pos.z);
+  p.setMass(Math.random(.8,1.0));
+  this.add(p);
+  //this.children.push(p);
+ // console.log(p.position);
+}
+
+
+Emitter.prototype.run = function(object){
+  if(this.children.length>0){
+    for(var i=this.children.length-1;i>0;i--){
+
+      if(this.children[i].isDead()){
+        this.remove(this.children[i]);
+        //delete this.children[i];
+      }else{
+        this.children[i].addForce(gravity);
+        var total = new THREE.Vector3(0,0,0);
+        for(var j=0;j<this.children.length;j++){
+          if(i != j){
+            total.add(repel(this.children[i].position,this.children[j].position));
+            total.add(attract(this.children[i].position,this.children[j].position));
+          }
+        }
+        // var orientation = this.position.clone();
+        // orientation.z -= .2;
+        // total.add(repel(this.children[i].position,orientation));
+        this.children[i].addForce(total);
+        this.children[i].update();
+
+        var pow = map(this.children[i].life, 0,120, 0, .15 );
+
+        object.addBall(this.children[i].position.x,
+                this.children[i].position.y,
+                this.children[i].position.z,
+                .02,
+                10);
+      }
+    }
+  }
+}
+
+var Particle = function() {
+  THREE.Object3D.call(this); 
+}
+
+Particle.prototype = new THREE.Object3D();
+
+
+Particle.prototype.init = function(pow){
+  this.acceleration = new THREE.Vector3(0,0,0);
+  this.velocity = new THREE.Vector3(0,0,0);
+  this.power = 0;
+  this.power += pow;
+  this.life = 40;
+}
+
+Particle.prototype.setPos = function(x,y,z){
+  this.position.set(x,y,z);
+}
+
+Particle.prototype.setMass = function(newMass){
+  this.mass = newMass;
+}
+
+Particle.prototype.update = function(){
+
+
+  this.velocity.add(this.acceleration);
+  this.velocity.clamp(new THREE.Vector3(-.009,-.009,.009), new THREE.Vector3(.009,.009,.009));
+  this.position.add(this.velocity);
+
+  this.acceleration.multiplyScalar(0);
+
+  if(this.life<0)this.life = 0;
+  else this.life--;
+}
+
+Particle.prototype.isDead = function(){
+  if(this.life<0) return true;
+  else return false;
+}
+
+Particle.prototype.addForce = function(force){
+  var f = new THREE.Vector3()
+  f = force.clone();
+  this.acceleration.add(f.divideScalar(this.mass));
+}
+
+var gravity = new THREE.Vector3(0,-.004,0);
+var emitter = new Emitter();
+var controls;
+var vomit, resolution, numBlobs;
+	var camera, scene, renderer;
+	 var geometry, material, mesh;
+  var cubes = [];
+var light, pointLight, ambientLight;
+
+var time = 0;
+var clock = new THREE.Clock();
+var uniforms;
+
+  var $VidWidth = 640;
+  var $VidHeight = 480;
+  var $SpeedMulti = 4.0;
+
+	function init() {
+
+  var container = document.getElementById("c");
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.className = "vomit";
+  renderer.setSize( $VidWidth, $VidHeight );
+  container.appendChild(renderer.domElement);
+
+    // var threeCanvas = renderer.domElement;
+    // var oldCanvas = $('#them_overlay')[0];
+    // oldCanvas.parentNode.replaceChild(threeCanvas, oldCanvas);
+    // threeCanvas.id = 'them_overlay';
+    
+    // NOTE: This cam position is designed to make the scene 640x480 units 
+    // at a Z Depth of 100, so we can treat them like pixels.
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera( 45, $VidWidth / $VidHeight, 1, 10000 );
+  camera.position.set( 0,0,50 );
+  //camera.position.set(0,0,10);
+  scene.add(camera);
+
+  light = new THREE.DirectionalLight( 0x3399ee );
+  light.position.set( -1., 0, 0 );
+  scene.add( light );
+
+  pointLight = new THREE.PointLight( 0xffffff );
+  pointLight.position.set( -500, 500, 1500 );
+  scene.add( pointLight );
+
+  ambientLight = new THREE.AmbientLight( 0x050505 );
+  scene.add( ambientLight );
+
+  resolution = 64;
+  numBlobs = 20;
+
+  var VOMITMAP = "/MIKE/vomitJS/lavatile.jpg";
+  var NOISEMAP = "/MIKE/vomitJS/heic1105a.jpg";
+      uniforms = {
+
+      time: { type: "f", value: 1.0 },
+      texture1: { type: "t", value: 0, texture: THREE.ImageUtils.loadTexture( NOISEMAP  ) },
+      texture2: { type: "t", value: 1, texture: THREE.ImageUtils.loadTexture( VOMITMAP ) }
+
+    };
+
+  uniforms.texture1.texture.wrapS = uniforms.texture1.texture.wrapT = THREE.Repeat;
+  uniforms.texture2.texture.wrapS = uniforms.texture2.texture.wrapT = THREE.Repeat;
+
+  // var material = new THREE.ShaderMaterial( {
+
+  //   uniforms: uniforms,
+  //   vertexShader: document.getElementById( 'vertexShader' ).textContent,
+  //   fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+
+  // } );
+  var texture = THREE.ImageUtils.loadTexture(NOISEMAP);
+  var material = new THREE.MeshPhongMaterial({ map: texture });
+
+  //var vomitMaterial = new THREE.MeshPhongMaterial( { color: 0x00FF00, specular: 0x004400, metal: true } );
+  vomit = new THREE.MarchingCubes( resolution, material , true, true );
+  vomit.position.set( 0, 0, 0 );
+  vomit.scale.set( 60, 50, 50 );
+
+  vomit.enableUvs = true;
+  vomit.enableColors = true;
+
+  scene.add( vomit );
+
+  emitter.position.set(.1,.9,.5);
+
+  scene.add(emitter);
+
+  updateCubes( vomit, time, 12, false, false, false );
+
+
+    // geometry = new THREE.SphereGeometry(1,32,32);
+    // mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    // mesh.position.set(0,0,0);
+    // scene.add(mesh);
+
+  console.log(vomit);
+
+	}
+
+  function map(val, inMin,  inMax, outMin, outMax){
+  return outMin + (outMax - outMin) * ((val - inMin) / (inMax - inMin));
+}
+
+
+  function updateCubes( object, time, numblobs, floor, wallx, wallz ) {
+
+      object.reset();
+
+      emitter.run(object);
+      //object.addBall(.5,.5,.5,1,10);
+
+      if ( floor ) object.addPlaneY( 2, 12 );
+      if ( wallz ) object.addPlaneZ( 2, 12 );
+      if ( wallx ) object.addPlaneX( 2, 12 );
+
+}
+
+function clamp(num, min, max) {
+  return Math.min(Math.max(num, min), max);
+}
+
+function repel(vec1, vec2){
+
+  var repulsion = new THREE.Vector3();
+  repulsion.subVectors(vec1,vec2);
+  var d = repulsion.length();
+  d = clamp(d,.7,.8);
+  var f = .000005/(d);
+  repulsion.normalize();
+  repulsion.multiplyScalar(f);
+  return repulsion;
+
+}
+
+function attract(vec1, vec2){
+
+  var attract = new THREE.Vector3();
+  attract.subVectors(vec1,vec2);
+  var d = attract.length();
+  d = clamp(d,.01,.95);
+  var f = .0000001/(d);
+  attract.normalize();
+  attract.multiplyScalar(-f);
+  return attract;
+
+}
+
+	function animateVomit() {
+
+		 //requestAnimationFrame( animateVomit );
+
+    var delta = clock.getDelta();
+    time += delta;
+
+    //emitter.addParticle(.5,.75,.5);
+    uniforms.time.value += delta;
+
+    updateCubes( vomit, time, 20, false,false,false );
+
+		renderer.render( scene, camera );
+
+    console.log(emitter.children.length);
+
+	}
+  
+	init();
+	//animateVomit();
+  
+  </script>
+</body>
+</html>

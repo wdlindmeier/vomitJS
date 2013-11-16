@@ -198,8 +198,8 @@ function startTracking() {
   //var vid = document.getElementById('my-video');
   var vid = document.getElementById('their-video');
   //var overlay = document.getElementById('overlay');
-  var overlay = document.getElementById('them_overlay');
-  var overlayCC = overlay.getContext('2d');
+ // var overlay = document.getElementById('them_overlay');
+ // var overlayCC = overlay.getContext('2d');
   
   $CTrack = new clm.tracker({useWebGL : true});
   $CTrack.init(pModel);
@@ -221,9 +221,9 @@ function startTracking() {
       {
           return;
       }
-      requestAnimationFrame(drawLoop);
+    requestAnimationFrame(drawLoop);
       
-    overlayCC.clearRect(0, 0, overlay.width, overlay.height);
+    //overlayCC.clearRect(0, 0, overlay.width, overlay.height);
     //psrElement.innerHTML = "score :" + ctrack.getScore().toFixed(4);
     
     var positions = $CTrack.getCurrentPosition();
@@ -244,10 +244,18 @@ function startTracking() {
         $MouthY = ((topY + bottomY) / 2) - 240;        
         
         var distance = Math.sqrt((xDelta*xDelta) + (yDelta*yDelta));
-        if (distance > 10)
+        if (distance > 4)
         {
-            console.log("Dist " + distance);
-            addCube($MouthX,$MouthY,$MouthZ);
+            console.log("Dist " + distance);//+" "+$MouthX+" "+$MouthY+" "+$MouthZ);
+
+            var x = map($MouthX, 0, $VidWidth, .5 , .9);
+            var y = map($MouthY, 0, $VidHeight, .5 , .1);
+            var z = .5;
+
+
+            emitter.addParticle(x,y,z);
+
+            //addCube($MouthX,$MouthY,$MouthZ);
         }
         // console.log("distance: "+distance);
         
