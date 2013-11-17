@@ -191,7 +191,10 @@ function stopTracking() {
     $CTrack = null;
 }
 
-function startTracking() {
+var $LikelihoodOfProjectileVomiting = 0;
+
+function startTracking() 
+{
 
     stopTracking();
     
@@ -244,14 +247,31 @@ function startTracking() {
         $MouthY = ((topY + bottomY) / 2) - 240;        
         
         var distance = Math.sqrt((xDelta*xDelta) + (yDelta*yDelta));
-        if (distance > 4)
+        var MIN_DISTANCE_FOR_PUKE = 7;
+        var MIN_LIKELIHOOD_FOR_PUKE = 10;
+        
+        if (distance > MIN_DISTANCE_FOR_PUKE)
         {
-            console.log("Dist " + distance);//+" "+$MouthX+" "+$MouthY+" "+$MouthZ);
+            $LikelihoodOfProjectileVomiting += 0.2;
+        }
+        else 
+        {
+            $LikelihoodOfProjectileVomiting -= 0.1;
+            if ($LikelihoodOfProjectileVomiting < 0)
+            {
+                $LikelihoodOfProjectileVomiting = 0;
+            }
+        }
+
+        if (distance > MIN_DISTANCE_FOR_PUKE && 
+            $LikelihoodOfProjectileVomiting > MIN_LIKELIHOOD_FOR_PUKE)
+        {
+            // console.log(distance, yDelta, $LikelihoodOfProjectileVomiting);            
+            // console.log("Dist " + distance);//+" "+$MouthX+" "+$MouthY+" "+$MouthZ);
 
             var x = map($MouthX, 0, $VidWidth, .5 , .9);
             var y = map($MouthY, 0, $VidHeight, .5 , .1);
             var z = .5;
-
 
             emitter.addParticle(x,y,z);
 
